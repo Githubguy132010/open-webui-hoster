@@ -1,0 +1,38 @@
+name: Host Open-WebUI
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Run every hour
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  host-webui:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install ngrok
+        run: |
+          curl -L https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-linux-amd64.zip -o ngrok.zip
+          unzip ngrok.zip
+          chmod +x ngrok
+
+      - name: Set up ngrok auth
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        run: ./ngrok authtoken $NGROK_AUTH_TOKEN
+
+      - name: Pull and run Open-WebUI
+        run: |
+          docker run -d -p 3000:8080 -v ollama:/root/.ollama -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:ollama
+          sleep 240  # Wait for container to start up
+
+      - name: Start ngrok tunnel
+        run: |
+          ./ngrok http 3000 --log=stdout > ngrok.log &
+          sleep 10
+          NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
+          echo "Open-WebUI is accessible at: $NGROK_URL"
+
+      - name: Keep alive
+        run: |
+          # Keep the workflow running for ~55 minutes (allowing for cleanup)
+          sleep 3300
