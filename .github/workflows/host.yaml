@@ -25,14 +25,38 @@ jobs:
           docker run -d -p 3000:8080 -v ollama:/root/.ollama -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:ollama
           sleep 240  # Wait for container to start up
 
-      - name: Start ngrok tunnel
+      - name: Start ngrok tunnel and get URL
         run: |
-          ./ngrok http 3000 --log=stdout > ngrok.log &
-          sleep 10
-          NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
-          echo "Open-WebUI is accessible at: $NGROK_URL"
+          # Start ngrok in the background
+          ./ngrok http 3000 > ngrok.log 2>&1 &
+          
+          # Wait for ngrok to start and create the API
+          sleep 15
+          
+          # Try multiple times to get the URL in case of slow startup
+          for i in {1..5}; do
+            if NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'); then
+              if [ ! -z "$NGROK_URL" ] && [ "$NGROK_URL" != "null" ]; then
+                break
+              fi
+            fi
+            sleep 5
+          done
+          
+          # Store URL in environment file for GitHub Actions
+          echo "NGROK_URL=$NGROK_URL" >> $GITHUB_ENV
+          
+          # Print URL with clear formatting
+          echo "::notice ::Open-WebUI is accessible at: $NGROK_URL"
+          echo "============================================="
+          echo "🌐 Access URL: $NGROK_URL"
+          echo "============================================="
 
       - name: Keep alive
         run: |
           # Keep the workflow running for ~55 minutes (allowing for cleanup)
-          sleep 3300
+          # Print URL every 5 minutes to keep it visible in logs
+          for i in {1..11}; do
+            echo "Current access URL: ${{ env.NGROK_URL }}"
+            sleep 300
+          done
