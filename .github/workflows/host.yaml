@@ -6,7 +6,7 @@ on:
   workflow_dispatch:  # Allow manual triggers
 
 jobs:
-  host-webui:
+  install-ngrok:
     runs-on: ubuntu-latest
     steps:
       - name: Install ngrok
@@ -19,7 +19,7 @@ jobs:
         env:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: ./ngrok authtoken $NGROK_AUTH_TOKEN
-
+  run-open-webui:
       - name: Check and run Open-WebUI
         run: |
           # Check if container exists and is running
@@ -38,15 +38,15 @@ jobs:
           
           # Wait for container to be healthy
           echo "Waiting for container to be ready..."
-          sleep 120
-
+          sleep 15
+start-ngrok-tunnel:
       - name: Start ngrok tunnel and get URL
         run: |
           # Start ngrok in the background with the skip browser warning header
           ./ngrok http 3000 --log=stdout --request-header-add "ngrok-skip-browser-warning: true" > ngrok.log 2>&1 &
           
           # Wait for ngrok to start and create the API
-          sleep 15
+          sleep 5
           
           # Debug: Check if ngrok is running
           ps aux | grep ngrok
@@ -81,7 +81,7 @@ jobs:
           echo "============================================="
           echo "🌐 Access URL: $NGROK_URL"
           echo "============================================="
-
+keep-openwebui-alive:
       - name: Keep alive
         run: |
           # Keep the workflow running for ~55 minutes (allowing for cleanup)
