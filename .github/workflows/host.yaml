@@ -28,23 +28,38 @@ jobs:
       - name: Start ngrok tunnel and get URL
         run: |
           # Start ngrok in the background
-          ./ngrok http 3000 > ngrok.log 2>&1 &
+          ./ngrok http 3000 --log=stdout > ngrok.log 2>&1 &
           
           # Wait for ngrok to start and create the API
           sleep 15
           
+          # Debug: Check if ngrok is running
+          ps aux | grep ngrok
+          
+          # Debug: Check ngrok logs
+          cat ngrok.log
+          
           # Try multiple times to get the URL in case of slow startup
-          for i in {1..5}; do
+          for i in {1..10}; do
+            echo "Attempt $i to get ngrok URL..."
             if NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url'); then
               if [ ! -z "$NGROK_URL" ] && [ "$NGROK_URL" != "null" ]; then
+                echo "Successfully got ngrok URL"
                 break
               fi
             fi
+            echo "Failed to get URL, waiting 5 seconds..."
             sleep 5
           done
           
+          # Debug: Show final URL value
+          echo "Final NGROK_URL value: $NGROK_URL"
+          
           # Store URL in environment file for GitHub Actions
           echo "NGROK_URL=$NGROK_URL" >> $GITHUB_ENV
+          
+          # Set output for the step
+          echo "ngrok_url=$NGROK_URL" >> $GITHUB_OUTPUT
           
           # Print URL with clear formatting
           echo "::notice ::Open-WebUI is accessible at: $NGROK_URL"
@@ -56,7 +71,10 @@ jobs:
         run: |
           # Keep the workflow running for ~55 minutes (allowing for cleanup)
           # Print URL every 5 minutes to keep it visible in logs
+          echo "Initial URL check: ${{ env.NGROK_URL }}"
           for i in {1..11}; do
+            echo "Time elapsed: $((i*5)) minutes"
             echo "Current access URL: ${{ env.NGROK_URL }}"
+            curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url' || echo "Failed to get current URL"
             sleep 300
           done
