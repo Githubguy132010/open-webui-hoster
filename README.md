@@ -4,7 +4,7 @@ Run Open-WebUI in a GitHub Actions workflow with ngrok tunnel access. Auto-resta
 
 ## Quick Start
 
-1. Click on Use this template
+1. Fork the repository
 2. Add your ngrok auth token as `NGROK_AUTH_TOKEN` in repository secrets
    - Get token from [ngrok.com](https://ngrok.com) (free account)
    - Repository Settings > Secrets and Variables > Actions
