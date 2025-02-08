@@ -42,8 +42,8 @@ jobs:
 
       - name: Start ngrok tunnel and get URL
         run: |
-          # Start ngrok in the background
-          ./ngrok http 3000 --log=stdout > ngrok.log 2>&1 &
+          # Start ngrok in the background with the skip browser warning header
+          ./ngrok http 3000 --log=stdout --request-header ngrok-skip-browser-warning:true > ngrok.log 2>&1 &
           
           # Wait for ngrok to start and create the API
           sleep 15
