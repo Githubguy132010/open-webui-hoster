@@ -20,13 +20,40 @@ jobs:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: ./ngrok authtoken $NGROK_AUTH_TOKEN
 
+      - name: Cache Docker container state
+        id: cache-container
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/container-save
+            ~/volume-data
+          key: ${{ runner.os }}-docker-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-docker-
+
+      - name: Load cached container and volumes
+        if: steps.cache-container.outputs.cache-hit == 'true'
+        run: |
+          # Restore volume data
+          sudo mkdir -p /var/lib/docker/volumes/ollama/_data
+          sudo mkdir -p /var/lib/docker/volumes/open-webui/_data
+          sudo cp -r ~/volume-data/ollama/* /var/lib/docker/volumes/ollama/_data/ || true
+          sudo cp -r ~/volume-data/open-webui/* /var/lib/docker/volumes/open-webui/_data/ || true
+          
+          # Load the container if it exists
+          if [ -f ~/container-save/open-webui.tar ]; then
+            docker load < ~/container-save/open-webui.tar
+          fi
+
       - name: Run Open-WebUI
         run: |
-          # Run the container directly since this is a fresh environment
-          docker run -d -p 3000:8080 --gpus=all -v ollama:/root/.ollama -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:ollama          
+          # Pull and run the container
+          docker pull ghcr.io/open-webui/open-webui:ollama
+          docker run -d -p 3000:8080 -v ollama:/root/.ollama -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:ollama
+          
           # Wait for container to be ready
           echo "Waiting for container to be ready..."
-          sleep 5
+          sleep 15
 
       - name: Start ngrok tunnel and get URL
         run: |
@@ -72,12 +99,28 @@ jobs:
 
       - name: Keep alive
         run: |
-          # Keep the workflow running for ~55 minutes (allowing for cleanup)
-          # Print URL every 5 minutes to keep it visible in logs
+          # Keep the workflow running for ~50 minutes (allowing time for cleanup and saves)
           echo "Initial URL check: ${{ env.NGROK_URL }}"
-          for i in {1..11}; do
+          for i in {1..10}; do
             echo "Time elapsed: $((i*5)) minutes"
             echo "Current access URL: ${{ env.NGROK_URL }}"
             curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url' || echo "Failed to get current URL"
             sleep 300
           done
+
+      - name: Save container and volume state
+        if: always()
+        run: |
+          # Create save directories
+          mkdir -p ~/container-save ~/volume-data/ollama ~/volume-data/open-webui
+          
+          # Save the container
+          docker commit open-webui open-webui:latest
+          docker save open-webui:latest > ~/container-save/open-webui.tar
+          
+          # Save volume data
+          sudo cp -r /var/lib/docker/volumes/ollama/_data/* ~/volume-data/ollama/ || true
+          sudo cp -r /var/lib/docker/volumes/open-webui/_data/* ~/volume-data/open-webui/ || true
+          
+          # Ensure correct permissions for cache
+          sudo chown -R $(id -u):$(id -g) ~/container-save ~/volume-data
