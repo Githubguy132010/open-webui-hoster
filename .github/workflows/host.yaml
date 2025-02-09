@@ -20,25 +20,13 @@ jobs:
           NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         run: ./ngrok authtoken $NGROK_AUTH_TOKEN
 
-      - name: Check and run Open-WebUI
+      - name: Run Open-WebUI
         run: |
-          # Check if container exists and is running
-          if ! docker ps -a --format '{{.Names}}' | grep -q '^open-webui$'; then
-            echo "Container doesn't exist, creating new one..."
-            docker run -d -p 3000:8080 -v ollama:/root/.ollama -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:ollama
-          else
-            echo "Container exists, checking status..."
-            if ! docker ps --format '{{.Names}}' | grep -q '^open-webui$'; then
-              echo "Container exists but not running, starting it..."
-              docker start open-webui
-            else
-              echo "Container is already running"
-            fi
-          fi
-          
-          # Wait for container to be healthy
+          # Run the container directly since this is a fresh environment
+          docker run -d -p 3000:8080 --gpus=all -v ollama:/root/.ollama -v open-webui:/app/backend/data --name open-webui --restart always ghcr.io/open-webui/open-webui:ollama          
+          # Wait for container to be ready
           echo "Waiting for container to be ready..."
-          sleep 15
+          sleep 5
 
       - name: Start ngrok tunnel and get URL
         run: |
