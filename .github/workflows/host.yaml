@@ -81,7 +81,7 @@ jobs:
           done
 
       - name: Create Release with New URL
-        uses: actions/create-release@v4
+        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
