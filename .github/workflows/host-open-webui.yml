@@ -1,3 +1,31 @@
+name: Host Open-WebUI
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Run every hour
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  host-openwebui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55  # Auto-restart before GitHub's 6-hour limit
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Load configuration
+        id: config
+        run: |
+          sudo apt-get install -y yq
+          echo "OPENWEBUI_IMAGE=$(yq '.openwebui.image' config.yml)" >> $GITHUB_ENV
+          echo "OPENWEBUI_PORT=$(yq '.openwebui.port' config.yml)" >> $GITHUB_ENV
+          echo "OLLAMA_IMAGE=$(yq '.ollama.image' config.yml)" >> $GITHUB_ENV
+          echo "DOWNLOAD_MODELS=$(yq '.ollama.download_models | join(" ")' config.yml)" >> $GITHUB_ENV
+          echo "NGROK_REGION=$(yq '.ngrok.region' config.yml)" >> $GITHUB_ENV
+          echo "UPDATE_INTERVAL=$(yq '.ngrok.update_interval' config.yml)" >> $GITHUB_ENV
+          echo "OPENROUTER_API_KEY=$(yq '.openwebui.api_keys.openrouter' config.yml)" >> $GITHUB_ENV
+
       - name: Start Ollama container
         run: |
           docker run -d --name ollama -v ollama:/root/.ollama ${{ env.OLLAMA_IMAGE }}
@@ -15,3 +43,46 @@
           fi
         env:
           DOWNLOAD_MODELS: ${{ env.DOWNLOAD_MODELS }}
+
+      - name: Start Open-WebUI container
+        run: |
+          docker run -d --name open-webui \
+            -p ${{ env.OPENWEBUI_PORT }}:${{ env.OPENWEBUI_PORT }} \
+            -v open-webui:/app/backend/data \
+            -e OPENROUTER_API_KEY=${{ env.OPENROUTER_API_KEY }} \
+            --network host ${{ env.OPENWEBUI_IMAGE }}
+          
+          # Wait for Open-WebUI to initialize
+          echo "Waiting for Open-WebUI to start..."
+          sleep 15
+
+      - name: Start ngrok tunnel and get URL
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        run: |
+          curl -s https://ngrok-agent.s3.amazonaws.com/ngrok.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/ngrok.gpg
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" | sudo tee /etc/apt/sources.list.d/ngrok.list
+          sudo apt update && sudo apt install -y ngrok jq
+          ngrok config add-authtoken $NGROK_AUTH_TOKEN
+          ngrok http ${{ env.OPENWEBUI_PORT }} --region=${{ env.NGROK_REGION }} --log=stdout > ngrok.log &
+          
+          # Wait for ngrok to start
+          echo "Starting ngrok tunnel..."
+          sleep 10
+          
+          # Function to display the URL
+          display_url() {
+            url=$(curl -s http://localhost:4040/api/tunnels | jq -r '.tunnels[0].public_url')
+            echo "============================================="
+            echo "🌐 Access URL: $url"
+            echo "============================================="
+          }
+          
+          # Display URL initially
+          display_url
+          
+          # Keep the workflow running and update URL every configured interval
+          while true; do
+            sleep ${{ env.UPDATE_INTERVAL }}
+            display_url
+          done
