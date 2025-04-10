@@ -17,11 +17,12 @@ jobs:
       - name: Load configuration
         id: config
         run: |
-          sudo apt-get install -y yq
+          sudo apt-get install -y yq jq
           echo "OPENWEBUI_IMAGE=$(yq '.openwebui.image' config.yml)" >> $GITHUB_ENV
           echo "OPENWEBUI_PORT=$(yq '.openwebui.port' config.yml)" >> $GITHUB_ENV
           echo "OLLAMA_IMAGE=$(yq '.ollama.image' config.yml)" >> $GITHUB_ENV
-          echo "DOWNLOAD_MODELS=$(yq '.ollama.download_models | join(" ")' config.yml)" >> $GITHUB_ENV
+          echo "MODELS_FILE=$(yq '.ollama.models_file' config.yml)" >> $GITHUB_ENV
+          echo "DOWNLOAD_MODELS=$(jq -r '.models | join(" ")' $(yq -r '.ollama.models_file' config.yml))" >> $GITHUB_ENV
           echo "NGROK_REGION=$(yq '.ngrok.region' config.yml)" >> $GITHUB_ENV
           echo "UPDATE_INTERVAL=$(yq '.ngrok.update_interval' config.yml)" >> $GITHUB_ENV
           echo "OPENROUTER_API_KEY=$(yq '.openwebui.api_keys.openrouter' config.yml)" >> $GITHUB_ENV

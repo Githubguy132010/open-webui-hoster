@@ -11,9 +11,9 @@ openwebui:
 # Ollama Container Settings
 ollama:
   image: ollama/ollama
-  download_models: ["llama3.2:1b", "llama3.2:3b", "deepseek-r1", "deepseek-r1:1.5b"]
+  models_file: models.json  # Reference to external JSON file containing models to download
 
 # Ngrok Tunnel Settings
 ngrok:
-  region: us  # Options: us, eu, ap, au, sa, jp, in
+  region: eu  # Options: us, eu, ap, au, sa, jp, in
   update_interval: 300  # How often to refresh URL in logs (seconds)
