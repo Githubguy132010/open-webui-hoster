@@ -2,15 +2,15 @@
 
 # Open-WebUI Container Settings
 openwebui:
-  image: ghcr.io/open-webui/open-webui:latest
-  port: 3000
+  image: ghcr.io/open-webui/open-webui:ollama  # Using the bundled image with Ollama included
+  host_port: 3000                              # Port on the host
+  container_port: 8080                         # Port inside the container
   # API integrations
   api_keys:
     openrouter: "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"  # Your OpenRouter API key
 
-# Ollama Container Settings
+# Ollama Settings (used by the bundled container)
 ollama:
-  image: ollama/ollama
   models_file: models.json  # Reference to external JSON file containing models to download
 
 # Ngrok Tunnel Settings
