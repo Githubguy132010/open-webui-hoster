@@ -11,7 +11,7 @@ openwebui:
 # Ollama Container Settings
 ollama:
   image: ollama/ollama
-  download_models: ["llama3.2", "deepseek-r1"]  # Add model names to download on startup, e.g. ["llama3", "mistral"]
+  download_models: ["llama3.2:1b", "deepseek-r1"]  # Add model names to download on startup, e.g. ["llama3", "mistral"]
 
 # Ngrok Tunnel Settings
 ngrok:
