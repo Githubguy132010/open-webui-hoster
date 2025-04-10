@@ -27,9 +27,19 @@ jobs:
           echo "UPDATE_INTERVAL=$(yq '.ngrok.update_interval' config.yml)" >> $GITHUB_ENV
           echo "OPENROUTER_API_KEY=$(yq '.openwebui.api_keys.openrouter' config.yml)" >> $GITHUB_ENV
 
+      - name: Create Docker network
+        run: |
+          if ! docker network inspect openwebui-network > /dev/null 2>&1; then
+            docker network create openwebui-network
+          else
+            echo "Docker network 'openwebui-network' already exists."
+          fi
+
       - name: Start Ollama container
         run: |
-          docker run -d --name ollama -v ollama:/root/.ollama ${{ env.OLLAMA_IMAGE }}
+          docker run -d --name ollama \
+            --network openwebui-network \
+            -v ollama:/root/.ollama ${{ env.OLLAMA_IMAGE }}
           
           # Wait for Ollama to initialize
           echo "Waiting for Ollama to initialize..."
@@ -48,14 +58,25 @@ jobs:
       - name: Start Open-WebUI container
         run: |
           docker run -d --name open-webui \
+            --network openwebui-network \
             -p ${{ env.OPENWEBUI_PORT }}:${{ env.OPENWEBUI_PORT }} \
             -v open-webui:/app/backend/data \
+            -e OLLAMA_API_BASE_URL=http://ollama:11434/api \
             -e OPENROUTER_API_KEY=${{ env.OPENROUTER_API_KEY }} \
-            --network host ${{ env.OPENWEBUI_IMAGE }}
+            ${{ env.OPENWEBUI_IMAGE }}
           
           # Wait for Open-WebUI to initialize
           echo "Waiting for Open-WebUI to start..."
           sleep 15
+          
+          # Check if Open-WebUI is running properly
+          if ! curl -s http://localhost:${{ env.OPENWEBUI_PORT }} > /dev/null; then
+            echo "ERROR: Open-WebUI is not responding. Container logs:"
+            docker logs open-webui
+            exit 1
+          else
+            echo "Open-WebUI is running successfully!"
+          fi
 
       - name: Start ngrok tunnel and get URL
         env:
