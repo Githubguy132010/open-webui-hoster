@@ -6,12 +6,12 @@ openwebui:
   port: 3000
   # API integrations
   api_keys:
-    openrouter: ""  # Your OpenRouter API key
+    openrouter: "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"  # Your OpenRouter API key
 
 # Ollama Container Settings
 ollama:
   image: ollama/ollama
-  download_models: [llama3.2 deepseek-r1]  # Add model names to download on startup, e.g. ["llama3", "mistral"]
+  download_models: ["llama3.2", "deepseek-r1"]  # Add model names to download on startup, e.g. ["llama3", "mistral"]
 
 # Ngrok Tunnel Settings
 ngrok:
