@@ -8,7 +8,7 @@ on:
 jobs:
   host-openwebui:
     runs-on: ubuntu-latest
-    timeout-minutes: 55  # Auto-restart before GitHub's 6-hour limit
+    timeout-minutes: 60 # Auto-restart before GitHub's 6-hour limit
 
     steps:
       - name: Checkout code
