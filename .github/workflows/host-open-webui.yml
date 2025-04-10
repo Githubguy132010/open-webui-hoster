@@ -28,22 +28,32 @@ jobs:
           echo "OPENROUTER_API_KEY=$(yq '.openwebui.api_keys.openrouter' config.yml)" >> $GITHUB_ENV
 
       - name: Create Docker network
-        run: |
-          if ! docker network inspect openwebui-network > /dev/null 2>&1; then
-            docker network create openwebui-network
-          else
-            echo "Docker network 'openwebui-network' already exists."
-          fi
+        run: docker network create openwebui-network
 
       - name: Start Ollama container
         run: |
           docker run -d --name ollama \
             --network openwebui-network \
+            -p 11434:11434 \
             -v ollama:/root/.ollama ${{ env.OLLAMA_IMAGE }}
           
           # Wait for Ollama to initialize
           echo "Waiting for Ollama to initialize..."
-          sleep 10
+          sleep 15
+          
+          # Check if Ollama API is responding
+          for i in {1..5}; do
+            if curl -s http://localhost:11434/api/version > /dev/null; then
+              echo "Ollama API is ready!"
+              break
+            fi
+            echo "Ollama API not ready yet, waiting... (attempt $i/5)"
+            sleep 5
+          done
+          
+          # Show Ollama version
+          echo "Ollama version:"
+          curl -s http://localhost:11434/api/version | jq
           
           # Download configured models if any
           if [ ! -z "$DOWNLOAD_MODELS" ]; then
@@ -62,21 +72,36 @@ jobs:
             -p ${{ env.OPENWEBUI_PORT }}:${{ env.OPENWEBUI_PORT }} \
             -v open-webui:/app/backend/data \
             -e OLLAMA_API_BASE_URL=http://ollama:11434/api \
+            -e WEBUI_URL=http://localhost:${{ env.OPENWEBUI_PORT }} \
+            -e WEBUI_AUTH_DISABLED=true \
             -e OPENROUTER_API_KEY=${{ env.OPENROUTER_API_KEY }} \
             ${{ env.OPENWEBUI_IMAGE }}
           
-          # Wait for Open-WebUI to initialize
-          echo "Waiting for Open-WebUI to start..."
-          sleep 15
+          # Wait longer for Open-WebUI to initialize
+          echo "Waiting for Open-WebUI to initialize (30 seconds)..."
+          sleep 30
           
-          # Check if Open-WebUI is running properly
-          if ! curl -s http://localhost:${{ env.OPENWEBUI_PORT }} > /dev/null; then
-            echo "ERROR: Open-WebUI is not responding. Container logs:"
+          # Check if container is still running
+          if ! docker ps | grep -q open-webui; then
+            echo "ERROR: Open-WebUI container is not running. Container logs:"
             docker logs open-webui
             exit 1
-          else
-            echo "Open-WebUI is running successfully!"
           fi
+          
+          # Check if Open-WebUI is responding
+          for i in {1..10}; do
+            if curl -s http://localhost:${{ env.OPENWEBUI_PORT }} > /dev/null; then
+              echo "Open-WebUI is running successfully!"
+              break
+            fi
+            if [ $i -eq 10 ]; then
+              echo "ERROR: Open-WebUI is not responding after multiple attempts. Container logs:"
+              docker logs open-webui
+              exit 1
+            fi
+            echo "Open-WebUI not responding yet, waiting... (attempt $i/10)"
+            sleep 5
+          done
 
       - name: Start ngrok tunnel and get URL
         env:
